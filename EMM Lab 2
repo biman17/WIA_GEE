@@ -1,0 +1,32 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var srtm = ee.Image("USGS/SRTMGL1_003"),
+    geometry = /* color: #00ffff */ee.Geometry.Polygon(
+        [[[131.8513057901572, -12.73062980761169],
+          [131.6590450479697, -13.276561822488008],
+          [131.6810177042197, -13.799931761263336],
+          [132.2028682901572, -14.018547385213056],
+          [133.1531856729697, -13.62382374536614],
+          [133.8508175089072, -13.180308536865281],
+          [133.3015011026572, -12.366017919822822],
+          [132.2577999307822, -12.419669601146952]]]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+print(srtm);
+Map.addLayer(srtm, {min: 0, max: 1000, palette: ['blue', 'yellow', 'red']}, 'Elevation above sea level');
+
+var hillshade = ee.Terrain.hillshade(srtm);
+Map.addLayer(hillshade, {min: 150, max:255}, 'Hillshade');
+
+var high = srtm.gt(200);
+Map.addLayer(high, {}, 'Above 200m');
+
+var slope = ee.Terrain.slope(srtm);
+Map.addLayer(slope, {min: 0, max: 60}, 'Slope');
+
+Map.addLayer(srtm, {min: 0, max: 1000}, 'DEM');
+Map.addLayer(geometry);
+var dict = srtm.reduceRegion({
+        reducer: 'mean',
+        geometry: geometry,
+        scale: 90
+});
+print('Mean elevation', dict);

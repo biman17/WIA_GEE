@@ -1,0 +1,68 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var roi = 
+    /* color: #98ff00 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[134.29363878147572, -13.502046661880222],
+          [134.29363878147572, -18.203489151199502],
+          [143.75286729710072, -18.203489151199502],
+          [143.75286729710072, -13.502046661880222]]], null, false),
+    mangrove_locations = ee.FeatureCollection("users/biman17/mangrove_points"),
+    evi = ee.ImageCollection("MODIS/006/MOD13Q1");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+var oeel=require('users/OEEL/lib:loadAll');
+
+var filtered = evi.filterDate('2013-01-01', '2021-12-30')
+  .filterBounds(roi);
+// print(filtered)
+
+var bufferPoly = function(feature) {
+  return feature.buffer(250);   // substitute in your value of Z here
+};
+
+var bufferedPolys = mangrove_locations.map(bufferPoly);
+
+var modis=oeel.ImageCollection.SavatskyGolayFilter(filtered,
+        ee.Filter.maxDifference(1000*3600*24*15, 'system:time_start', null, 'system:time_start'),
+        function(infromedImage,estimationImage){
+          return ee.Image.constant(ee.Number(infromedImage.get('system:time_start'))
+            .subtract(ee.Number(estimationImage.get('system:time_start'))));},
+        3,['EVI']);
+// print('Smoothed data',ui.Chart.image.series(modis.select('EVI'), roi, ee.Reducer.mean(), 250));
+Map.addLayer(bufferedPolys)  
+print(bufferedPolys)
+        
+print(modis);
+var EVI_series =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: modis,
+          band: 'EVI',
+          regions: bufferedPolys,
+          reducer: ee.Reducer.median(),
+          scale: 250,
+          seriesProperty: 'Code',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          title: 'Average EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          }
+        });
+print(EVI_series);
+
+// Map.addLayer(modis.median().clip(roi), {bands: 'EVI'}, 'EVI');
+
+
+// Map.addLayer(filtered.clip(roi));
+

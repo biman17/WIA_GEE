@@ -1,0 +1,81 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var roi = 
+    /* color: #98ff00 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[150.8809044944345, -31.070736860862745],
+          [150.8809044944345, -31.135703342281133],
+          [150.9959176169931, -31.135703342281133],
+          [150.9959176169931, -31.070736860862745]]], null, false),
+    modis = ee.ImageCollection("MODIS/006/MOD11A2"),
+    modis_aqua = ee.ImageCollection("MODIS/006/MYD11A2");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// A start date is defined and the end date is determined by advancing 1 year from the start date.
+var start = ee.Date('2015-01-01');
+var dateRange = ee.DateRange(start, start.advance(1, 'year'));
+
+// Filter the LST collection to include only images from time frame and select day time temperature band
+
+var modLSTday = modis.filterDate(dateRange).select('LST_Day_1km')
+  .filterBounds(roi);
+  
+
+var modLSTnight = modis_aqua.filterDate(dateRange).select('LST_Night_1km')
+  .filterBounds(roi);
+  
+// Scale to Kelvin and convert to Celsius, set image acquisition time.
+var modC = modLSTday.map(function(image) {
+  return image
+    .multiply(0.02)
+    .subtract(273.15)
+    .copyProperties(image, ['system:time_start']);
+});
+
+var modC_night = modLSTnight.map(function(image) {
+  return image
+    .multiply(0.02)
+    .subtract(273.15)
+    .copyProperties(image, ['system:time_start']);
+});
+var lst = ee.ImageCollection((modC, modC_night))
+print(lst)
+
+// Map.addLayer(modLSTday)
+print(modC)
+// Chart the time-series
+var temp_trend = ui.Chart.image.series({
+  imageCollection: lst,
+  region: roi,
+  reducer: ee.Reducer.median(),
+  scale: 1000,
+  xProperty: 'system:time_start'})
+  // .setSeriesNames(['LST_Night_1km', 'LST_Day_1km'])
+  .setOptions({
+    lineWidth: 1,
+    pointSize: 3,
+    trendlines: {0: {
+        color: 'CC0000'
+      }},
+     title: 'LST  Time Series',
+     vAxis: {title: 'LST Celsius'}});
+print(temp_trend);
+
+//Clip to roi
+var LSTclip = modC.mean().clip(roi);
+var LSTclip_night = modC_night.mean().clip(roi);
+
+// Add clipped image layer to the map.
+Map.addLayer(LSTclip, {
+  min: 0, max: 40,
+  palette: ['blue', 'limegreen', 'yellow', 'darkorange', 'red']},
+  'Mean temperature');
+  
+Map.addLayer(LSTclip_night, {
+  min: 0, max: 40,
+  palette: ['blue', 'limegreen', 'yellow', 'darkorange', 'red']},
+  'Mean temperature');

@@ -1,0 +1,443 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var modis = ee.ImageCollection("MODIS/006/MOD09A1"),
+    roi = 
+    /* color: #98ff00 */
+    /* shown: false */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[134.29363878147572, -13.502046661880222],
+          [134.29363878147572, -18.203489151199502],
+          [143.75286729710072, -18.203489151199502],
+          [143.75286729710072, -13.502046661880222]]], null, false),
+    L8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2"),
+    mangrove_locations = ee.FeatureCollection("users/biman17/Mangrove_data1"),
+    chirps_5 = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//var oeel=require('users/OEEL/lib:loadAll')
+
+var palettes = require('users/gena/packages:palettes')
+var palRdGn = palettes.colorbrewer.BrBG[7]
+var palAccent = palettes.colorbrewer.Accent[7]
+
+
+function addNDVI(image){
+  var ndvi = image.normalizedDifference(['SR_B5','SR_B4']).rename('NDVI');
+  return image.addBands(ndvi);
+}
+
+var bufferPoly = function(feature) {
+  return feature.buffer(100); 
+};
+
+function getTempC(image){
+  var temp = image.select('ST_B10').multiply(0.00341802).add(149).subtract(273.15).rename('LST');
+  return image.addBands(temp);
+}
+
+var buff = mangrove_locations.map(bufferPoly);
+
+var year = "2013"
+,year2 = "2200"
+,month = "01"
+,month2 = "12"
+,start_date = year+"-"+month+"-01"
+,end_date = year2+"-"+month2+"-31";
+
+var dieback_1 = '2015-01-01';
+var dieback_2 = '2016-12-31';
+
+var storm_1 = '2018-01-01';
+var storm_2 = '2019-12-31';
+
+var L8_filt = L8.filterBounds(roi)
+.filterDate(year+"-"+month+"-01", year2+"-"+month2+"-31")
+.filter(ee.Filter.lt("CLOUD_COVER_LAND", 0.6))
+.select(['SR_B5','SR_B4', 'ST_B10']);
+
+var with_ndvi = L8_filt.map(addNDVI);
+// print(with_ndvi)
+// var before_ndvi = with_ndvi.filterDate('')
+// Map.addLayer(with_ndvi.select('NDVI').median().clip(roi), {min:0, max:0.3, palette:palRdGn}, 'NDVI_Median')
+
+var with_ndvi_temp = with_ndvi.map(getTempC)
+// print(with_ndvi_temp)
+
+//print(modis_EVI);
+
+// interpolate between data and smooth out
+/*
+var modis_sg=oeel.ImageCollection.SavatskyGolayFilter(modis_EVI.select('EVI'),
+        ee.Filter.maxDifference(1000*3600*24*15, 'system:time_start', null, 'system:time_start'),
+        function(informedImage,estimationImage){
+          return ee.Image.constant(ee.Number(informedImage.get('system:time_start'))
+            .subtract(ee.Number(estimationImage.get('system:time_start'))));},
+        3,['EVI']);
+print(modis_sg.select('d_0_EVI'));
+Map.addLayer(modis_sg.select('d_0_EVI').first())        
+print('Smoothed data',ui.Chart.image.series(modis_sg.select('d_0_EVI'), aoi, ee.Reducer.mean(), 250));
+*/
+// print('buff',buff);
+var ndvi_dieback =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: with_ndvi.filterDate(dieback_1,dieback_2),
+          band: 'NDVI',
+          regions: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.mean(),
+          scale: 30,
+          seriesProperty: 'Loc',
+          xProperty: 'system:time_start'
+          }
+        )
+        .setOptions({
+          title: 'Average Landsat 8 NDVI During the Diebacks season (2015-16)',
+          hAxis: {gridlines: {count: 0},title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {gridlines: {count: 0},title: 'NDVI',titleTextStyle: {italic: false, bold: true}
+          },
+          curveType: 'function',
+          // trendlines: {
+          //   0: {  // add a trend line to the 1st series
+          //     type: 'polynomial',  // or 'polynomial', 'exponential'
+          //     degree:9,
+          //     color: 'green',
+          //     lineWidth: 5,
+          //     opacity: 0.2,
+          //     visibleInLegend: true,
+          //   }
+          // },
+          interpolateNulls: true,
+          lineWidth: 1.5,
+          
+        });
+print(ndvi_dieback);
+
+
+
+var ndvi_storm =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: with_ndvi.filterDate(storm_1,storm_2),
+          band: 'NDVI',
+          regions: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.mean(),
+          scale: 30,
+          seriesProperty: 'Loc',
+          xProperty: 'system:time_start'
+          }
+        )
+        .setOptions({
+          title: 'Average Landsat 8 NDVI During the Storm season(2018-19)',
+          hAxis: {gridlines: {count: 0},title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {gridlines: {count: 0},title: 'NDVI',titleTextStyle: {italic: false, bold: true}},
+          curveType: 'function',
+          // trendlines: {
+          //   0: {  // add a trend line to the 1st series
+          //     type: 'polynomial',  // or 'polynomial', 'exponential'
+          //     degree:9,
+          //     color: 'green',
+          //     lineWidth: 5,
+          //     opacity: 0.2,
+          //     visibleInLegend: true,
+          //   }
+          // },
+          interpolateNulls: true,
+          lineWidth: 1.5,
+          
+        });
+print(ndvi_storm);
+
+
+
+var l8_LST_dieback =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: with_ndvi_temp.filterDate(dieback_1,dieback_2),
+          band: 'LST',
+          regions: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.mean(),
+          scale: 100,
+          seriesProperty: 'Loc',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          title: 'Average Landsat 8 LST Value During the Diebacks season (2015-16)',
+          hAxis: {gridlines: {count: 0},title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {gridlines: {count: 0},title: 'LST', titleTextStyle: {italic: false, bold: true}},
+          curveType: 'function',
+          trendlines: {
+            0: {  // add a trend line to the 1st series
+              type: 'linear',  // or 'polynomial', 'exponential'
+              color: 'green',
+              lineWidth: 5,
+              opacity: 0.2,
+              visibleInLegend: false,
+            }
+          },
+          interpolateNulls: true,
+          lineWidth: 2,
+         
+        });
+print(l8_LST_dieback);
+
+
+var l8_LST_storm =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: with_ndvi_temp.filterDate(storm_1,storm_2),
+          band: 'LST',
+          regions: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.mean(),
+          scale: 100,
+          seriesProperty: 'Loc',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          title: 'Average Landsat 8 LST Value During the Storm season (2018-19)',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {title: 'LST',titleTextStyle: {italic: false, bold: true}},
+          curveType: 'function',
+          trendlines: {
+            0: {  // add a trend line to the 1st series
+              type: 'linear',  // or 'polynomial', 'exponential'
+              color: 'green',
+              lineWidth: 5,
+              opacity: 0.2,
+              visibleInLegend: false,
+            }
+          },
+          interpolateNulls: true,
+          lineWidth: 2,
+         
+        });
+print(l8_LST_storm);
+
+
+var rain_storm=
+    ui.Chart.image
+        .series({
+          imageCollection: chirps_5.filterDate(storm_1,storm_2).select('precipitation'),
+          region: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.sum(),
+          scale: 1000,
+          // seriesProperty: 'Loc',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          title: 'Total 5-Day Precipitation Value During the Storm season (2018-19)',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {viewWindow: {min:0,max:40}, title: 'LST',titleTextStyle: {italic: false, bold: true}},
+          // curveType: 'function',
+          // trendlines: {
+          //   0: {  // add a trend line to the 1st series
+          //     type: 'linear',  // or 'polynomial', 'exponential'
+          //     color: 'green',
+          //     lineWidth: 5,
+          //     opacity: 0.2,
+          //     visibleInLegend: false,
+          //   }
+          // },
+          interpolateNulls: true,
+          lineWidth: 1,
+         
+        });
+print(rain_storm);
+
+
+
+var rain_dieback =
+    ui.Chart.image
+        .series({
+          imageCollection: chirps_5.filterDate(dieback_1,dieback_2).select('precipitation'),
+          region: buff,//.filter(ee.Filter.eq('Code', '1B')),
+          reducer: ee.Reducer.sum(),
+          scale: 1000,
+          
+          // seriesProperty: 'Loc',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          colors: ['red'],
+          title: 'Total 5-Day Precipitation Value During the Dieback season (2015-16)',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {viewWindow: {min:0,max:40},title: 'Precipitation (mm/pentad)',titleTextStyle: {italic: false, bold: true}},
+          // curveType: 'function',
+          // trendlines: {
+          //   0: {  // add a trend line to the 1st series
+          //     type: 'linear',  // or 'polynomial', 'exponential'
+          //     color: 'green',
+          //     lineWidth: 5,
+          //     opacity: 0.2,
+          //     visibleInLegend: false,
+          //   }
+          // },
+          interpolateNulls: true,
+          lineWidth: 1,
+         
+        });
+print(rain_dieback);
+Map.addLayer(buff)
+
+/*
+var modisEVI_series =
+    ui.Chart.image
+        .series({
+          imageCollection: modis_sg.select('d_0_EVI'),
+          region: aoi,
+          reducer: ee.Reducer.mean(),
+          scale: 250,
+          }
+        )
+        .setOptions({
+          title: 'Average MODIS EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+        });
+print(modisEVI_series);
+*/
+/*
+var modisEVI_series =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: sg_collection,
+          band: 'sum',
+          regions: aoi,
+          reducer: ee.Reducer.mean(),
+          scale: 250,
+          seriesProperty: 'State',
+          xProperty: 'system:time_start',
+          }
+        )
+        .setOptions({
+          title: 'Average MODIS EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+          trendlines:{0:{
+          color:'black'
+          },1:{
+            color:'green'
+          }},
+        });
+print(modisEVI_series);
+
+var VIIRSEVI_series =
+    ui.Chart.image
+        .seriesByRegion({
+          imageCollection: VIIRS_EVI,
+          band: 'EVI2',
+          regions: aoi,
+          reducer: ee.Reducer.mean(),
+          scale: 250,
+          seriesProperty: 'State',
+          xProperty: 'system:time_start'
+        })
+        .setOptions({
+          title: 'Average VIIRS EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+          trendlines:{0:{
+          color:'black'
+          },1:{
+            color:'green'
+          }},
+        });
+print(VIIRSEVI_series);
+
+
+//DoybyRegion
+var modisEVI_doyseries =
+    ui.Chart.image
+        .doySeriesByRegion({
+          imageCollection: modis_EVI,
+          bandName: 'EVI',
+          regions: aoi,
+          regionReducer: ee.Reducer.mean(),
+          scale: 250,
+          yearReducer: ee.Reducer.mean(),
+          startDay:1,
+          endDay:365,
+          seriesProperty:"Code",
+          }
+        )
+        .setOptions({
+          title: 'Average MODIS EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+        });
+print(modisEVI_doyseries);
+*/
+/*
+var VIIRSEVI_series_doy =
+    ui.Chart.image
+        .doySeriesByYear({
+          imageCollection: VIIRS_EVI,
+          bandName: 'EVI2',
+          region: aoi,
+          regionReducer: ee.Reducer.mean(),
+          scale: 250,
+          sameDayReducer: ee.Reducer.mean(),
+          startDay:1,
+          endDay:365
+        })
+        .setOptions({
+          title: 'Average VIIRS EVI Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'EVI',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+        });
+print(VIIRSEVI_series_doy);
+
+var LST_series =
+    ui.Chart.image
+        .doySeriesByYear({
+          imageCollection: modis_LST_img,
+          bandName: 'LST_Day_1km',
+          region: aoi,
+          regionReducer: ee.Reducer.mean(),
+          scale: 1000,
+          sameDayReducer: ee.Reducer.mean(),
+          startDay:1,
+          endDay:365
+        })
+        .setOptions({
+          title: 'Average MODIS LST Value by Date',
+          hAxis: {title: 'Date', titleTextStyle: {italic: false, bold: true}},
+          vAxis: {
+            title: 'LST',
+            titleTextStyle: {italic: false, bold: true}
+          },
+          lineWidth: 2,
+          colors: ['red', 'blue', 'green','purple','pink'],
+        });
+print(LST_series);*/

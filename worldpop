@@ -1,0 +1,16 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var table = ee.FeatureCollection("users/biman17/kerala_aoi_final"),
+    image = ee.Image("CGIAR/SRTM90_V4");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+
+Export.image.toDrive({
+  image: image.reproject('EPSG:32643', null, 90),
+  description: 'SRTM_90m',
+  scale: 90,
+  region: table,
+  fileFormat: 'GeoTIFF',
+  formatOptions: {
+    cloudOptimized: true
+  }
+});

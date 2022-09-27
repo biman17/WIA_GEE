@@ -1,0 +1,101 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var CHIRPS = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD"),
+    roi = 
+    /* color: #bf04c2 */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[73.47553878366936, 27.10796955678707],
+          [73.47553878366936, 26.460673431083627],
+          [74.53022628366936, 26.460673431083627],
+          [74.53022628366936, 27.10796955678707]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+//Import the MODIS image collection MOD13A1 V6
+var collection = ee.ImageCollection('MODIS/006/MOD13A1').select('EVI');
+ 
+// Choose a reference period for your baseline
+var reference = collection.filterDate('2001-01-01', '2010-12-31')
+  .sort('system:time_start');
+  
+//Compute the mean EVI for the reference time frame
+var mean = reference.mean();
+ 
+//Define visualisation parameters for EVI
+var vis = {min: 1367, max: 5200, palette: ['brown','yellow','green']};
+// Map EVI spatially
+// Map.addLayer(mean, vis, 'Reference EVI');
+
+//Create a collection of images that represent more recent conditions
+ var recent = collection.filterDate('2011-01-01', '2020-12-31');
+ // Calculate recent mean
+ var meanRecent = recent.mean();
+ // Map EVI spatially for recent years
+// Map.addLayer(meanRecent, vis, 'Recent EVI');
+ 
+ 
+ //Define a function to subtract the reference mean
+var subtractmean = function(image) {
+  return image.subtract(mean).copyProperties(image, ['system:time_start']);
+};
+
+//Create a variable called anomalies by mapping the subtract mean over the recent time-series
+var anomalies = recent.map(subtractmean);
+
+//Map the cumulative anomalies by summing them
+// Map.addLayer(anomalies.sum(), {
+//   min: -10000,
+//   max: 10000,
+//   palette: [
+//     'darkred','red','yellow','green','darkgreen'
+//   ]}, 'Cumulative anomaly');
+
+//Get timestamp of first image
+var time0 = reference.first().get('system:time_start');
+
+//Create and empty list (zeros) list to provide a structure into which the EVI anomalies can be mapped
+var first = ee.List([
+  ee.Image(0).set('system:time_start', time0).rename('EVI')
+]);
+
+// print(first)
+print("-1",first.get(-1))
+//Use a function to iterate through time and accumulate the anomalies
+var accumulate = function(image, list) {
+  var previous = ee.Image(ee.List(list).get(-1));
+  var added = image.add(previous)
+    .set('system:time_start', image.get('system:time_start'));
+  return ee.List(list).add(added);
+};
+
+//Run the iteration
+var cumulative = ee.ImageCollection(ee.List(
+  anomalies.iterate(accumulate, first)
+));
+
+print(cumulative)
+
+//Centre map on roi and specify zoom range (1-22)
+Map.centerObject(roi, 7);
+
+//Define chart parameters
+var chartParam = {
+ title: 'Cumulative EVI anomaly over time',
+  hAxis: {title: 'Time'},
+  vAxis: {title: 'Cumulative EVI anomaly'},
+};
+
+//Plot the chart
+var chart = ui.Chart.image.seriesByRegion({
+  imageCollection: cumulative,
+  regions: roi,
+  reducer: ee.Reducer.mean(),
+  band: 'EVI',
+  scale: 500,
+  xProperty: 'system:time_start',
+  seriesProperty: 'PROJECT'
+});
+//Print chart to console
+print(chart.setOptions(chartParam));

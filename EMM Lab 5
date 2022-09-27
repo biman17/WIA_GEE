@@ -1,0 +1,39 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var CHIRPS = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD"),
+    roi = 
+    /* color: #0b4a8b */
+    /* displayProperties: [
+      {
+        "type": "rectangle"
+      }
+    ] */
+    ee.Geometry.Polygon(
+        [[[86.31099155328624, 29.484968308130814],
+          [86.31099155328624, 21.419762779568895],
+          [98.76948764703624, 21.419762779568895],
+          [98.76948764703624, 29.484968308130814]]], null, false);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+// Load collection
+
+
+//Define date range of interest
+var precip = CHIRPS.filterDate('1981-01-01','2018-12-31');
+// var TS5 = ui.Chart.image.series(precip, roi, ee.Reducer.mean(),1000, 'system:time_start').setOptions({
+// title: 'Precipitation Full Time Series',
+// vAxis: {title: 'mm/pentad'}, });
+// print(TS5);
+
+var precip1year=CHIRPS.filterDate('2018-01-01','2018-12-13');
+var TS1 = ui.Chart.image.series(precip1year, roi, ee.Reducer.mean(),1000, 'system:time_start').setOptions({
+title: 'Precipitaon 1‐Year Time Series',
+vAxis: {title: 'mm/pentad'}, });
+print(TS1);
+
+var yearPrecip = precip1year.mean().clip(roi);
+
+var meanPrecip = precip.mean().clip(roi);
+print(meanPrecip)
+Map.addLayer(yearPrecip, {min: 0, max: 40,
+  palette:['lightblue','blue','darkblue']}, 'Year Precipitation');
+Map.addLayer(meanPrecip, {min: 0, max: 40,
+  palette:['lightblue','blue','darkblue']}, 'Mean Precipitation');

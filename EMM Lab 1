@@ -1,0 +1,49 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var campus = /* color: #d63000 */ee.Geometry.Point([130.87659042866548, -12.369007790905172]),
+    sent2 = ee.ImageCollection("COPERNICUS/S2"),
+    falseColour = {"bands":["B8","B4","B3"],"min":0,"max":3000},
+    trueColour = {"bands":["B4","B3","B2"],"min":0,"max":3000};
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+
+// This is our first line of code. Let’s define the image collection we are working with by writing this command
+var image = ee.Image(sent2
+
+// We will then include a filter to get only images in the date range we are interested in
+.filterDate("2015-07-01", "2017-09-30")
+
+// Next we include a geographic filter to narrow the search to images at the location of our point
+.filterBounds(campus)
+
+// Next we will also sort the collection by a metadata property, in our case cloud cover is a very useful one
+.sort("CLOUD_COVERAGE_ASSESSMENT")
+
+// Now lets select the first image out of this collection - i.e. the most cloud free image in the date range
+.first());
+
+// And let's print the image to the console.
+print("A Sentinel-2 scene:", image);
+
+
+
+// Define visualization parameters in a JavaScript dictionary for true colour rendering. Bands 4,3 and 2 needed for RGB.
+
+
+// Add the image to the map, using the visualization parameters.
+Map.addLayer(image, trueColour, "True-colour image");
+
+
+
+// Add the image to the map, using the visualisation parameters.
+Map.addLayer(image, falseColour, "False-colour composite");
+
+
+//Define variable NDVI from equation
+var NDVI = image.expression(
+    "(NIR - RED) / (NIR + RED)",
+    {
+      RED: image.select("B4"),    //  RED
+      NIR: image.select("B8"),    // NIR
+      BLUE: image.select("B2")    // BLUE
+    });
+
+Map.addLayer(NDVI, {min: 0, max: 1, palette: ['brown', 'yellow', 'green']}, "NDVI colour");

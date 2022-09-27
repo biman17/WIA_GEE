@@ -1,0 +1,32 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA"),
+    rgb_vis = {"min":0,"max":0.3,"bands":["B4","B3","B2"]},
+    roi = /* color: #d63000 */ee.Geometry.Point([-102.36743943120102, 35.91010719360726]);
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+function addNDVI(image) {
+  var ndvi = image.normalizedDifference(['B5', 'B4']).rename("NDVI");
+  return image.addBands(ndvi);
+    }
+    
+    
+var filtered = L8.filterDate('2018-01-01', '2018-12-30')
+  .filterBounds(roi);
+// Map.addLayer(filtered);
+var image = ee.Image(filtered.first());
+
+// Map.addLayer(filtered, rgb_vis, 'RGB');
+// Map.addLayer(filtered.median(), rgb_vis, 'RGB - median reducer');
+var with_ndvi = filtered.map(addNDVI);
+print(with_ndvi)
+// Map.addLayer(filtered.median(), rgb_vis, 'RGB');
+// Map.addLayer(with_ndvi.median(), {bands: 'NDVI', min: 0, max: 1}, 'NDVI');
+
+var greenest = with_ndvi.qualityMosaic('NDVI');
+Map.addLayer(greenest, rgb_vis, 'RGB (greenest pixel)');
+
+print(ui.Chart.image.series(with_ndvi.select('NDVI'), roi));
+
+var rgb = greenest.visualize(rgb_vis);
+Map.addLayer(rgb,{}, 'RGB');
+
+Export.image.toDrive(rgb, 'GreenestPixel');

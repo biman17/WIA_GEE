@@ -1,0 +1,72 @@
+/**** Start of imports. If edited, may not auto-convert in the playground. ****/
+var imageCollection = ee.ImageCollection("TRMM/3B42"),
+    aoi = ee.FeatureCollection("users/biman17/kerala_aoi_final");
+/***** End of imports. If edited, may not auto-convert in the playground. *****/
+var startDate = ee.Date('2018-06-01');
+var endDate = ee.Date('2018-08-30');
+var precip = imageCollection.select('precipitation').filterDate(startDate, endDate);
+var days = ee.List.sequence(1,31);
+// var months = ee.List.sequence(06, 08);
+var years = ee.List.sequence(2018, 2018);
+
+
+var numberOfDays = endDate.difference(startDate, 'days')
+var daily = ee.ImageCollection(
+  ee.List.sequence(0, numberOfDays.subtract(1))
+    .map(function (dayOffset) {
+      var start = startDate.advance(dayOffset, 'days')
+      var end = start.advance(1, 'days')
+      return precip
+        .filterDate(start, end)
+        .sum()
+    })
+)
+
+print(daily)
+
+
+Map.addLayer(daily.first());
+
+
+// var byDayMonth = ee.ImageCollection.fromImages(
+//   month.map(function(y) {
+//     return months.map(function (m) {
+//       return precip
+//         .filter(ee.Filter.calendarRange(y, y, 'year'))
+//         .filter(ee.Filter.calendarRange(m, m, 'month'))
+//         .set('month', m).set('year', y);
+//   });
+// }).flatten());
+
+// var byMonthYear_max = ee.ImageCollection.fromImages(
+//   years.map(function(y) {
+//     return months.map(function (m) {
+//       return modLSTc
+//         .filter(ee.Filter.calendarRange(y, y, 'year'))
+//         .filter(ee.Filter.calendarRange(m, m, 'month'))
+//         .max()
+//         .set('month', m).set('year', y);
+//   });
+// }).flatten());
+
+// Export.image.toDrive({
+//   image: byMonthYear_min.toBands().reproject('EPSG:32630', null, 1000),
+//   description: 'MODIS_Terra_LST_1km_min',
+//   scale: 1000,
+//   region: aoi,
+//   fileFormat: 'GeoTIFF',
+//   formatOptions: {
+//     cloudOptimized: true
+//   }
+// });
+
+// Export.image.toDrive({
+//   image: byMonthYear_max.toBands().reproject('EPSG:32630', null, 1000),
+//   description: 'MODIS_Terra_LST_1km_max',
+//   scale: 1000,
+//   region: aoi,
+//   fileFormat: 'GeoTIFF',
+//   formatOptions: {
+//     cloudOptimized: true
+//   }
+// });
